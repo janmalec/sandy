@@ -165,7 +165,10 @@ class XsCov(BaseCov):
                     covs.append(cov)
                 if not covs:
                     continue
-                cov = sandy.EnergyCov.sum_covs(*covs)
+                if len(covs) > 1:
+                    cov = sandy.EnergyCov.sum_covs(*covs)
+                else:
+                    cov=covs[0]
                 if not cov.data.any(axis=None):
                     logging.warn(f"\tempty covariance for "
                                  f"'({mat}/{mt}), ({mat1}/{mt1})'")
