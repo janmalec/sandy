@@ -223,7 +223,7 @@ class Xs():
     def _nubar_to_endf6(self, endf6):
         data = endf6.data.copy()
         mf = 1
-        for (mat, mt), xs in self.data.iteritems():
+        for (mat, mt), xs in self.data.items():
             # Must read original section to extract info not given in `Xs`
             if (mat, mf, mt) not in endf6.keys:
                 continue
@@ -244,7 +244,7 @@ class Xs():
     def _xs_to_endf6(self, endf6):
         data = endf6.data.copy()
         mf = 3
-        for (mat, mt), xs in self.data.iteritems():
+        for (mat, mt), xs in self.data.items():
             # Must read original section to extract info not given in `Xs`
             # instance, e.g. QI, QM
             if (mat, mf, mt) not in endf6.keys:
@@ -453,7 +453,7 @@ class Xs():
         eg = errorr.energy_grid
         tape = errorr.filter_by(listmf=[3])
         listxs = []
-        for (mat,mf,mt),text in tape.TEXT.iteritems():
+        for (mat,mf,mt),text in tape.TEXT.items():
             X = tape.read_section(mat, mf, mt)
             xs = pd.Series(
                       X["XS"],

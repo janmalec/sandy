@@ -279,5 +279,5 @@ def test_mf8_read_rdd_2(U234):
 @pytest.mark.big
 def test_mf8_read_rdd_jeff33():
     rdd = sandy.read_formatted_file(os.path.join("sandy", "data", "RDD", "RDD.jeff33"))
-    for (mat,mf,mt),text in rdd.filter_by(listmt=[457]).TEXT.iteritems():
+    for (mat,mf,mt),text in rdd.filter_by(listmt=[457]).TEXT.items():
         rdd.read_section(mat,mf,mt)

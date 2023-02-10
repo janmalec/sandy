@@ -53,7 +53,7 @@ class Errorr(BaseFile):
         mat = self.index.get_level_values("MAT")[0]
         eg = self.read_section(mat,1,451)["EG"]
         ListXs = []
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             mat,mf,mt = ix
             X = self.read_section(*ix)
             xs = pd.Series(X["XS"], index=eg[:-1], name=(X["MAT"],X["MT"])).rename_axis("E").to_frame()

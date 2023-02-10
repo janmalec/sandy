@@ -199,7 +199,7 @@ class BaseCov(pd.DataFrame):
         columns = ["KEYS_ROWS", "KEYS_COLS", "COV"]
         # Reindex the cross-reaction matrices
         covs = pd.DataFrame.from_records(iterable).set_axis(columns, axis=1).set_index(columns[:-1]).COV
-        for (keys_rows,keys_cols), cov in covs.iteritems():
+        for (keys_rows,keys_cols), cov in covs.items():
             if keys_rows == keys_cols: # diagonal terms
                 if cov.data.shape[0] != cov.data.shape[1]:
                     raise SandyError("non-symmetric covariance matrix for ({}, {})".format(keys_rows, keys_cols))
@@ -225,7 +225,7 @@ class BaseCov(pd.DataFrame):
         index = pd.MultiIndex.from_tuples(indexlist, names=cls.labels)
         # Create global matrix
         matrix = np.zeros((len(index),len(index)))
-        for (keys_rows,keys_cols), cov in covs.iteritems():
+        for (keys_rows,keys_cols), cov in covs.items():
             ix = index.get_loc(keys_rows)
             ix1 = index.get_loc(keys_cols)
             matrix[ix.start:ix.stop,ix1.start:ix1.stop] = cov.data

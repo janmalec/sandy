@@ -362,7 +362,7 @@ class Xs(pd.DataFrame):
         eg = errorr.energy_grid
         tape = errorr.filter_by(listmf=[3])
         listxs = []
-        for (mat,mf,mt),text in tape.TEXT.iteritems():
+        for (mat,mf,mt),text in tape.TEXT.items():
             X = tape.read_section(mat, mf, mt)
             xs = pd.Series(
                       X["XS"],
@@ -783,7 +783,7 @@ class BaseCov(pd.DataFrame):
         columns = ["KEYS_ROWS", "KEYS_COLS", "COV"]
         # Reindex the cross-reaction matrices
         covs = pd.DataFrame.from_records(iterable, columns=columns).set_index(columns[:-1]).COV
-        for (keys_rows,keys_cols), cov in covs.iteritems():
+        for (keys_rows,keys_cols), cov in covs.items():
             if keys_rows == keys_cols: # diagonal terms
                 if cov.shape[0] != cov.shape[1]:
                     raise SandyError("non-symmetric covariance matrix for ({}, {})".format(keys_rows, keys_cols))
@@ -809,7 +809,7 @@ class BaseCov(pd.DataFrame):
         index = pd.MultiIndex.from_tuples(indexlist, names=cls.labels)
         # Create global matrix
         matrix = np.zeros((len(index),len(index)))
-        for (keys_rows,keys_cols), cov in covs.iteritems():
+        for (keys_rows,keys_cols), cov in covs.items():
             ix = index.get_loc(keys_rows)
             ix1 = index.get_loc(keys_cols)
             matrix[ix.start:ix.stop,ix1.start:ix1.stop] = cov
@@ -934,7 +934,7 @@ class XsCov(BaseCov):
         data = []
         # Loop MF/MT
         logging.debug("found {} covariance sections".format(len(tape)))
-        for (mat,mf,mt), text in tape.TEXT.iteritems():
+        for (mat,mf,mt), text in tape.TEXT.items():
             X = tape.read_section(mat, mf, mt)
             # Loop subsections
             logging.debug("reading section MAT={}/MF={}/MT={}".format(mat, mf, mt))
@@ -996,7 +996,7 @@ class XsCov(BaseCov):
         data = []
         # Loop MF/MT
         logging.debug("found {} covariance sections".format(len(tape)))
-        for (mat,mf,mt), text in tape.TEXT.iteritems():
+        for (mat,mf,mt), text in tape.TEXT.items():
             X = tape.read_section(mat, mf, mt)
             # Loop subsections
             logging.debug("reading section MAT={}/MF={}/MT={}".format(mat, mf, mt))
@@ -1272,7 +1272,7 @@ class LpcCov(BaseCov):
         data = []
         # Loop MF/MT
         logging.debug("found {} covariance sections".format(len(tape)))
-        for (mat,mf,mt), text in tape.TEXT.iteritems():
+        for (mat,mf,mt), text in tape.TEXT.items():
             X = tape.read_section(mat, mf, mt)
             # Loop subsections
             logging.debug("reading section MAT={}/MF={}/MT={}".format(mat, mf, mt))

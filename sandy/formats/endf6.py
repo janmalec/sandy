@@ -395,7 +395,7 @@ class Endf6(_BaseFile):
             condition = reduce(lambda x,y: np.logical_or(x, y), conditions)
             tape = tape[condition]
         ListXs = []
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             X = self.read_section(*ix)
             xs = pd.Series(X["XS"], index=X["E"], name=(X["MAT"],X["MT"])).rename_axis("E").to_frame()
             duplicates = [x for x, count in Counter(xs.index).items() if count > 1]
@@ -415,7 +415,7 @@ class Endf6(_BaseFile):
         from .mf3 import write
         tape = self.copy()
         mf = 3
-        for (mat,mt),xsSeries in xsFrame.iteritems():
+        for (mat,mt),xsSeries in xsFrame.items():
             if (mat,mf,mt) not in self.index: continue
             sec = self.read_section(mat,mf,mt)
             # Cut threshold xs
@@ -464,7 +464,7 @@ class Endf6(_BaseFile):
 #            query += " & ({})".format(query_mts)
 #        tape = self.query(query)
         ListXs = []
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             X = self.read_section(*ix)
             xs = pd.Series(X["NUBAR"], index=X["E"], name=(X["MAT"],X["MT"])).rename_axis("E").to_frame()
             duplicates = [x for x, count in Counter(xs.index).items() if count > 1]
@@ -484,7 +484,7 @@ class Endf6(_BaseFile):
         from .mf1 import write
         tape = self.copy()
         mf = 1
-        for (mat,mt),S in xsFrame.iteritems():
+        for (mat,mt),S in xsFrame.items():
             if (mat,mf,mt) not in self.index: continue
             sec = self.read_section(mat,mf,mt)
             # Cut threshold xs
@@ -547,7 +547,7 @@ class Endf6(_BaseFile):
 #            query += " & ({})".format(query_mts)
 #        tape = self.query(query)
         List = []; eg = set()
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             X = self.read_section(*ix)
             mat = X['MAT']; mt = X['MT']
             for sub in X["SUB"].values():
@@ -598,7 +598,7 @@ class Endf6(_BaseFile):
             condition = reduce(lambda x,y: np.logical_or(x, y), conditions)
             tape = tape[condition]
         DictLpc =  {}
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             X = self.read_section(*ix)
             if "LPC" not in X: continue
             if X["LPC"]["INT"] != [2]:
@@ -649,7 +649,7 @@ class Endf6(_BaseFile):
             condition = reduce(lambda x,y: np.logical_or(x, y), conditions)
             tape = tape[condition]
         List = []; eg = set()
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             X = self.read_section(*ix)
             mat = X['MAT']; mt = X['MT']
             for (mat1,mt1),rsec in X["REAC"].items():
@@ -752,7 +752,7 @@ class Endf6(_BaseFile):
             condition = reduce(lambda x,y: np.logical_or(x, y), conditions)
             tape = tape[condition]
         listfy = []
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             X = self.read_section(*ix)
             for e,esec in X["E"].items():
                 if listenergy is not None:
@@ -928,7 +928,7 @@ class Errorr(_BaseFile):
         mat = self.index.get_level_values("MAT")[0]
         eg = self.read_section(mat,1,451)["EG"]
         ListXs = []
-        for ix,text in tape.TEXT.iteritems():
+        for ix,text in tape.TEXT.items():
             mat,mf,mt = ix
             X = self.read_section(*ix)
             xs = pd.Series(X["XS"], index=eg[:-1], name=(X["MAT"],X["MT"])).rename_axis("E").to_frame()

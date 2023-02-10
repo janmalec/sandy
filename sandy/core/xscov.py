@@ -201,7 +201,7 @@ class XsCov(BaseCov):
 #        data = []
 #        # Loop MF/MT
 #        logging.debug("found {} covariance sections".format(len(tape)))
-#        for (mat,mf,mt), text in tape.TEXT.iteritems():
+#        for (mat,mf,mt), text in tape.TEXT.items():
 #            X = tape.read_section(mat, mf, mt)
 #            # Loop subsections
 #            logging.debug("reading section MAT={}/MF={}/MT={}".format(mat, mf, mt))
@@ -263,7 +263,7 @@ class XsCov(BaseCov):
         data = []
         # Loop MF/MT
         logging.debug("found {} covariance sections".format(len(tape)))
-        for (mat,mf,mt), text in tape.TEXT.iteritems():
+        for (mat,mf,mt), text in tape.TEXT.items():
             X = tape.read_section(mat, mf, mt)
             # Loop subsections
             logging.debug("reading section MAT={}/MF={}/MT={}".format(mat, mf, mt))
