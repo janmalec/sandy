@@ -69,20 +69,39 @@ class Pendf(_FormattedFile):
         return temps
 
     def gen_mf3_dic(self, mat):
+        """
+        Generate a dictionary with the MF3 data from a tape.
+
+        Args:
+            mat (str): The material tape.
+
+        Returns:
+            dict: A dictionary containing the lengths of MF3 data for each temperature.
+        """
         temps = self.read_temps(mat)
-        """Generate a dictionary with the MF3 data from a tape"""
         xs_lengths = dict()
         no_points = int(self._get_section_df(mat, 3, 1)["N2"][1])
         no_lines = int(np.ceil(no_points*2/6))
         xs_lengths[temps[0]] = no_lines
         for t in temps[1:]:
-            # for all temperatures exept last, get the next n3_points
+            # for all temperatures except last, get the next n3_points
             no_points = int(self._get_section_df(mat, 3, 1).iloc[no_lines+4]["N2"])
             no_lines += int(np.ceil(no_points*2/6+3))
             xs_lengths[t] = no_lines
         return xs_lengths
 
     def get_mf3_temp(self, mat, mt, temp):
+        """
+        Retrieves the cross-section data for a specific temperature from the MF3 section of a material.
+
+        Parameters:
+        - mat (str): Material identifier.
+        - mt (int): MT number.
+        - temp (float): Temperature in Kelvin.
+
+        Returns:
+        - df (pandas.DataFrame): Cross-section data for the specified temperature.
+        """
         mf=3
         xs_lengths = self.gen_mf3_dic(mat)
         dict_temps = sorted(list(xs_lengths.keys()))
@@ -182,4 +201,5 @@ def get_xs_temp(tape, temp):
     df = functools.reduce(foo, data) \
                     .interpolate(method='slinear', axis=0) \
                     .fillna(0)
-    return df
+    return sandy.Xs(df)
+
