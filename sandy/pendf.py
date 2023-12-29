@@ -21,6 +21,7 @@ class Pendf(_FormattedFile):
     """
     Container for pendf information grouped by MAT, MF and MT numbers.
     """
+    temperatures=None
     def _from_text(self, text):
         """Reads a pendf file from a text string.
         
@@ -66,9 +67,10 @@ class Pendf(_FormattedFile):
         temps = [self._get_section_df(9228, 1, 451)["C1"][i] for i in temp_lines]
         # Convert the temperatures to floats
         temps = list(map(float, temps))
+        self.temperatures = temps
         return temps
 
-    def gen_mf3_dic(self, mat):
+    def gen_mf3_dic(self, mat, mf):
         """
         Generate a dictionary with the MF3 data from a tape.
 
@@ -76,16 +78,17 @@ class Pendf(_FormattedFile):
             mat (str): The material tape.
 
         Returns:
-            dict: A dictionary containing the lengths of MF3 data for each temperature.
+            dict: A dictionary containing the lengths of MF1 data for each temperature.
         """
-        temps = self.read_temps(mat)
+        if not self.temperatures:
+            self.read_temps(mat)
         xs_lengths = dict()
-        no_points = int(self._get_section_df(mat, 3, 1)["N2"][1])
+        no_points = int(self._get_section_df(mat, 3, mf)["N2"][1])
         no_lines = int(np.ceil(no_points*2/6))
-        xs_lengths[temps[0]] = no_lines
-        for t in temps[1:]:
+        xs_lengths[self.temperatures[0]] = no_lines
+        for t in self.temperatures[1:]:
             # for all temperatures except last, get the next n3_points
-            no_points = int(self._get_section_df(mat, 3, 1).iloc[no_lines+4]["N2"])
+            no_points = int(self._get_section_df(mat, 3, mf).iloc[no_lines+4]["N2"])
             no_lines += int(np.ceil(no_points*2/6+3))
             xs_lengths[t] = no_lines
         return xs_lengths
@@ -103,7 +106,7 @@ class Pendf(_FormattedFile):
         - df (pandas.DataFrame): Cross-section data for the specified temperature.
         """
         mf=3
-        xs_lengths = self.gen_mf3_dic(mat)
+        xs_lengths = self.gen_mf3_dic(mat, mf)
         dict_temps = sorted(list(xs_lengths.keys()))
         if temp not in xs_lengths.keys():
             raise ValueError("Temperature not in tape")
@@ -114,6 +117,44 @@ class Pendf(_FormattedFile):
                 temp_prev = dict_temps[dict_temps.index(temp)-1]
                 df = self._get_section_df(mat, mf, mt).iloc[xs_lengths[temp_prev]+3:xs_lengths[temp]+3]
         return df
+    
+    def set_mf3_temp(self, mat, mt, temp, text):
+        """
+        Sets the cross-section data for a specific temperature in the MF3 section of a material.
+
+        Parameters:
+        - mat (str): Material identifier.
+        - mt (int): MT number.
+        - temp (float): Temperature in Kelvin.
+        - df (pandas.DataFrame): Cross-section data for the specified temperature.
+        """
+        data = self.data.copy()
+        mf=3
+        xs_lengths = self.gen_mf1_dic(mat)
+        dict_temps = sorted(list(xs_lengths.keys()))
+        if temp not in xs_lengths.keys():
+            raise ValueError("Temperature not in tape")
+        if temp == dict_temps[0]:
+            start = 0
+        else:
+            temp_prev = dict_temps[dict_temps.index(temp)-1]
+            start = xs_lengths[temp_prev]+3
+        end = xs_lengths[temp]+3
+        data[mat, mf, mt][start:end] = text
+        return data
+
+    
+    def get_endf_temp(self, temp):
+        """
+        Retrieves the ENDF file for a specific temperature.
+
+        Parameters:
+        - temp (float): Temperature in Kelvin.
+
+        Returns:
+        - endf file (str): ENDF file for the specified temperature.
+        """
+        # Loop over (mat, mf, mt) tuples. If
     
     def get_mf3_sect(self, mat, mt, temp):
         mf = 3
@@ -202,4 +243,3 @@ def get_xs_temp(tape, temp):
                     .interpolate(method='slinear', axis=0) \
                     .fillna(0)
     return sandy.Xs(df)
-
