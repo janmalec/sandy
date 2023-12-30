@@ -16,230 +16,124 @@ __version__ = "0.1.0"
 
 pd.options.display.float_format = '{:.5e}'.format
 
-
-class Pendf(_FormattedFile):
+def split_pendf_by_temperature(file_path):
     """
-    Container for pendf information grouped by MAT, MF and MT numbers.
+    Splits a PENDF file into sections based on temperature.
+
+    Args:
+        file_path (str): The path to the PENDF file.
+
+    Returns:
+        dict: A dictionary where the keys are temperature section IDs and the values are the corresponding sections as strings.
     """
-    temperatures=None
-    def _from_text(self, text):
-        """Reads a pendf file from a text string.
-        
-        Parameters
-        ----------
-        text : `str`
-            Text string to be parsed.
-        
-        Returns
-        -------
-        `sandy.Pendf`
-            Pendf object.
-        """
-        self._text = text
-        self._read_text()
-        return self
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
 
-    def read_temps(self, mat):
-        """
-        Read TEMPs from a pendf file.
-        
-        Parameters
-        ----------
-        tape : `sandy.formats.endf6.Endf6`
-            ENDF-6 file
-        mat : `int`
-            MAT number of the material to be read
-        
-        Returns
-        -------
-        `pandas.DataFrame`
-            TEMPs section of the pendf file
-        """
-        # Get the number of lines in the section
-        no_lines = int(self._get_section_df(mat, 1, 451)["N2"][3]) + 5
-        # Get the length of the dataframe
-        df_len = len(self._get_section_df(mat, 1, 451))
-        # Calculate the number of temperatures
-        no_temps = int(df_len/no_lines)
-        # Get the temperature lines
-        temp_lines = [i * no_lines + 3 for i in range(no_temps)]
-        # Get the temperatures from the dataframe
-        temps = [self._get_section_df(9228, 1, 451)["C1"][i] for i in temp_lines]
-        # Convert the temperatures to floats
-        temps = list(map(float, temps))
-        self.temperatures = temps
-        return temps
+    temperature_sections = {}
+    current_temp_id = 1
+    last_index = 0
+    last_mat_mf_mt = None
 
-    def gen_mf3_dic(self, mat, mf):
-        """
-        Generate a dictionary with the MF3 data from a tape.
+    for line in lines:
+        # Extract mat, mf, mt, and index values
+        mat, mf, mt, index = int(line[66:70].strip()), int(line[70:72].strip()), int(line[72:75].strip()), int(line[75:80].strip())
 
-        Args:
-            mat (str): The material tape.
+        # Check for a change in (mat, mf, mt)
+        if (mat, mf, mt) != last_mat_mf_mt and mf != 0 and mt != 0:
+            current_temp_id = 1
+            last_mat_mf_mt = (mat, mf, mt)
+            #print("new section", mat, mf, mt, index)
+        elif index == 1 and last_index != 1 and mf != 0 and mt != 0 and last_index != 99999:
+            # New temperature section for the same (mat, mf, mt)
+            current_temp_id += 1
 
-        Returns:
-            dict: A dictionary containing the lengths of MF1 data for each temperature.
-        """
-        if not self.temperatures:
-            self.read_temps(mat)
-        xs_lengths = dict()
-        no_points = int(self._get_section_df(mat, 3, mf)["N2"][1])
-        no_lines = int(np.ceil(no_points*2/6))
-        xs_lengths[self.temperatures[0]] = no_lines
-        for t in self.temperatures[1:]:
-            # for all temperatures except last, get the next n3_points
-            no_points = int(self._get_section_df(mat, 3, mf).iloc[no_lines+4]["N2"])
-            no_lines += int(np.ceil(no_points*2/6+3))
-            xs_lengths[t] = no_lines
-        return xs_lengths
+        # Initialize the temperature section if not already done
+        if current_temp_id not in temperature_sections:
+            temperature_sections[current_temp_id] = []
 
-    def get_mf3_temp(self, mat, mt, temp):
-        """
-        Retrieves the cross-section data for a specific temperature from the MF3 section of a material.
-
-        Parameters:
-        - mat (str): Material identifier.
-        - mt (int): MT number.
-        - temp (float): Temperature in Kelvin.
-
-        Returns:
-        - df (pandas.DataFrame): Cross-section data for the specified temperature.
-        """
-        mf=3
-        xs_lengths = self.gen_mf3_dic(mat, mf)
-        dict_temps = sorted(list(xs_lengths.keys()))
-        if temp not in xs_lengths.keys():
-            raise ValueError("Temperature not in tape")
+        # Append the line to the current temperature section
+        if mf != 0 and mt != 0:
+            temperature_sections[current_temp_id].append(line)
+        # otherwise append to all temperature sections
         else:
-            if temp == dict_temps[0]:
-                df = self._get_section_df(mat, mf, mt).iloc[:xs_lengths[temp]+3]
-            else:
-                temp_prev = dict_temps[dict_temps.index(temp)-1]
-                df = self._get_section_df(mat, mf, mt).iloc[xs_lengths[temp_prev]+3:xs_lengths[temp]+3]
-        return df
-    
-    def set_mf3_temp(self, mat, mt, temp, text):
-        """
-        Sets the cross-section data for a specific temperature in the MF3 section of a material.
+            for temp_id in temperature_sections:
+                temperature_sections[temp_id].append(line)
+        last_index = index
 
-        Parameters:
-        - mat (str): Material identifier.
-        - mt (int): MT number.
-        - temp (float): Temperature in Kelvin.
-        - df (pandas.DataFrame): Cross-section data for the specified temperature.
-        """
-        data = self.data.copy()
-        mf=3
-        xs_lengths = self.gen_mf1_dic(mat)
-        dict_temps = sorted(list(xs_lengths.keys()))
-        if temp not in xs_lengths.keys():
-            raise ValueError("Temperature not in tape")
-        if temp == dict_temps[0]:
-            start = 0
-        else:
-            temp_prev = dict_temps[dict_temps.index(temp)-1]
-            start = xs_lengths[temp_prev]+3
-        end = xs_lengths[temp]+3
-        data[mat, mf, mt][start:end] = text
-        return data
+    # Convert lists of lines to strings
+    for temp_id in temperature_sections:
+        temperature_sections[temp_id] = ''.join(temperature_sections[temp_id])
 
-    
-    def get_endf_temp(self, temp):
-        """
-        Retrieves the ENDF file for a specific temperature.
+    return temperature_sections
 
-        Parameters:
-        - temp (float): Temperature in Kelvin.
 
-        Returns:
-        - endf file (str): ENDF file for the specified temperature.
-        """
-        # Loop over (mat, mf, mt) tuples. If
-    
-    def get_mf3_sect(self, mat, mt, temp):
-        mf = 3
-        df = self.get_mf3_temp(mat, mt, temp)
-        out = {
-                "MAT": mat,
-                "MF": mf,
-                "MT": mt,
-                }
-        i = 0
-        C, i = sandy.read_cont(df, i)
-        add = {
-                "ZA": C.C1,
-                "AWR": C.C2,
-                "PFLAG": C.L2,
-                }
-        out.update(add)
-        T, i = sandy.read_tab1(df, i)
-        add = {
-                "QM": T.C1,
-                "QI": T.C2,
-                "LR": T.L2,
-                "NBT": T.NBT,
-                "INT": T.INT,
-                "E": T.x,
-                "XS": T.y,
-                }
-        out.update(add)
-        return out  
-    
-def get_xs_temp(tape, temp):
-    data = []
-    # read cross sections
-    #tape = tape.filter_by(listmf=[3])
-    keep = "first"
-    for mat, mf, mt in tape.data:
-        if mf != 3:
-            continue
-        sec = tape.get_mf3_sect(mat, mt, temp)
-        if sec['INT'] != [2]:
-            logging.warning(f"skip MAT{mat}/MF{mf}/MT{mt} "
-                            "because interpolation schme is not lin-lin")
-            continue
-        xs = pd.Series(sec["XS"], index=sec["E"], name=(mat, mt)) \
-                .rename_axis("E") \
-                .to_frame()
-        mask_duplicates = xs.index.duplicated(keep=keep)
-        for energy in xs.index[mask_duplicates]:
-            logging.warning("found duplicate energy for "
-                            f"MAT{mat}/MF{mf}/MT{mt} "
-                            f"at {energy:.5e} MeV, keep only {keep} value")
-        xs = xs[~mask_duplicates]
-        data.append(xs)
-    # read nubar
-    tape = tape.filter_by(listmf=[1], listmt=[452, 455, 456])
-    keep = "first"
-    for mat, mf, mt in tape.data:
-        sec = tape.read_section(mat, mf, mt)
-        if sec["LNU"] != 2:
-            logging.warning(f"skip MAT{mat}/MF{mf}/MT{mt} "
-                            "because not tabulated")
-            continue
-        if sec['INT'] != [2]:
-            logging.warning(f"skip MAT{mat}/MF{mf}/MT{mt} "
-                            "because interpolation schme is not lin-lin")
-            continue
-        xs = pd.Series(sec["NU"], index=sec["E"], name=(mat, mt)) \
-                .rename_axis("E") \
-                .to_frame()
-        mask_duplicates = xs.index.duplicated(keep=keep)
-        for energy in xs.index[mask_duplicates]:
-            logging.warning("found duplicate energy for "
-                            f"MAT{mat}/MF{mf}/MT{mt} "
-                            f"at {energy:.5e} MeV, keep only {keep} value")
-        xs = xs[~mask_duplicates]
-        data.append(xs)
-    if not data:
-        raise sandy.Error("cross sections were not found")
-    # should we sort index?
+def combine_pendf_sections(temperature_sections):
+    """
+    Combines multiple PENDF sections into a single section and writes it to an output file.
 
-    def foo(l, r):
-        how = "outer"
-        return pd.merge(l, r, left_index=True, right_index=True, how=how)
+    Parameters:
+    - temperature_sections (dict): A dictionary containing the PENDF sections for different temperatures.
+                                  The keys are the temperature IDs and the values are the corresponding sections.
+    - output_file_path (str): The file path where the combined PENDF section will be written.
 
-    df = functools.reduce(foo, data) \
-                    .interpolate(method='slinear', axis=0) \
-                    .fillna(0)
-    return sandy.Xs(df)
+    Returns:
+    - merged_section (str): The combined PENDF section.
+    """
+    def extract_mat_mf_mt(line):
+        return int(line[66:70].strip()), int(line[70:72].strip()), int(line[72:75].strip())
+
+    def is_zero_line(line):
+        mat, mf, mt = extract_mat_mf_mt(line)
+        return mf == 0 or mt == 0
+
+    # Preprocess: Split each section into lines
+    preprocessed_sections = {temp_id: section.split('\n') for temp_id, section in temperature_sections.items()}
+    print(preprocessed_sections.keys())
+
+    first_id = next(iter(preprocessed_sections))
+    combined_lines = [preprocessed_sections[first_id][0]]
+    current_mat_mf_mt = None
+    line_counters = {temp_id: 0 for temp_id in preprocessed_sections}
+    all_sections_processed = False
+    counter = 0
+
+    while not all_sections_processed:
+        all_sections_processed = True
+
+        for temp_id, section_lines in preprocessed_sections.items():
+            counter = line_counters[temp_id]
+            zero_lines = []
+            current_mat_mf_mt = None
+
+            while counter < len(section_lines):
+                line = section_lines[counter]
+                counter += 1
+
+                mat, mf, mt = extract_mat_mf_mt(line)
+
+                if current_mat_mf_mt is None and mf != 0 and mt != 0:
+                    current_mat_mf_mt = (mat, mf, mt)
+
+                if is_zero_line(line):
+                    zero_lines.append(line)
+
+                if not is_zero_line(line) and (mat, mf, mt) != current_mat_mf_mt:
+                    print("end section", current_mat_mf_mt, temp_id, temp_id == max(preprocessed_sections.keys()))
+                    break
+                line_counters[temp_id] = counter
+
+                if not is_zero_line(line):
+                    combined_lines.append(line)
+
+                all_sections_processed = False
+            
+            # Append zero lines if this is the last section
+            if temp_id == max(preprocessed_sections.keys()):
+                combined_lines.extend(zero_lines)
+                zero_lines = []
+
+            # Reset for the next section
+            if temp_id == max(preprocessed_sections.keys()):
+                current_mat_mf_mt = None
+
+    return '\n'.join(combined_lines)
