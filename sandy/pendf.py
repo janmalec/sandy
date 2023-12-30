@@ -66,6 +66,20 @@ def split_pendf_by_temperature(file_path):
 
     return temperature_sections
 
+def get_pendf_endf(file_path):
+    """
+    Returns a sandy.endf6 object from pendf files with
+    multiple temperatures.
+
+    Parameters:
+    file_path (str): The path to the pendf file.
+
+    Returns:
+    dict: A dictionary containing sandy.endf6 objects for each temperature section.
+    """
+    temperature_sections = split_pendf_by_temperature(file_path)
+    pendf_sections = {temp_id: sandy.Endf6.from_text(section) for temp_id, section in temperature_sections.items()}
+    return pendf_sections
 
 def combine_pendf_sections(temperature_sections):
     """
