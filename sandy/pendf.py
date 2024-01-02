@@ -40,9 +40,8 @@ def _split_pendf_format_1(lines):
     # add the last line from lines to all sections
     for section in sections:
         section.append(lines[indexes[-1]+1])
-        section.append('\n')
     # Convert all sections back to text
-    sections = [''.join(section) for section in sections]
+    sections = ['\n'.join(section) for section in sections]
     # convert to dict with indexes from 1
     return {i+1: section for i, section in enumerate(sections)}
 
@@ -162,6 +161,15 @@ def combine_pendf_sections(temperature_sections):
     Returns:
     - merged_section (str): The combined PENDF section.
     """
+
+    # If given a list of objects, convert to a dictionary
+    if isinstance(temperature_sections, list):
+        temperature_sections = {i+1: section for i, section in enumerate(temperature_sections)}
+
+    # If types are Endf6, use write_string() to get the text
+    if isinstance(temperature_sections[next(iter(temperature_sections))], sandy.Endf6):
+        temperature_sections = {temp_id: section.write_string() for temp_id, section in temperature_sections.items()}
+
     def extract_mat_mf_mt(line):
         return int(line[66:70].strip()), int(line[70:72].strip()), int(line[72:75].strip())
 
@@ -169,7 +177,7 @@ def combine_pendf_sections(temperature_sections):
         mat, mf, mt = extract_mat_mf_mt(line)
         return mf == 0 or mt == 0
 
-    # Preprocess: Split each section into lines
+    # Preprocess: Split each section into lines 
     preprocessed_sections = {temp_id: section.split('\n') for temp_id, section in temperature_sections.items()}
     print(preprocessed_sections.keys())
 
@@ -205,7 +213,7 @@ def combine_pendf_sections(temperature_sections):
                     zero_lines.append(line)
 
                 if not is_zero_line(line) and (mat, mf, mt) != current_mat_mf_mt:
-                    print("end section", current_mat_mf_mt, temp_id, temp_id == max(preprocessed_sections.keys()))
+                    #print("end section", current_mat_mf_mt, temp_id, temp_id == max(preprocessed_sections.keys()))
                     break
                 line_counters[temp_id] = counter
 
@@ -250,3 +258,106 @@ def make_pendfs(endf, **kwargs,):
         return outputs  # this contains the NJOY input
     # Split the output pendf and return endf objects
     return get_pendf_endf(outputs["pendf"])
+
+def apply_pendf_pert(endf, pendf, smps, processes=1, **kwargs):
+    """
+    Apply perturbations to PENDF data based on the given ENDF data.
+
+    Args:
+        endf (object): The ENDF data object.
+        pendf (object): The PENDF data object.
+        smps (dict): Dictionary of SMPs (Standardized Monte Carlo Parameters).
+        processes (int, optional): Number of processes to use for parallel execution. Defaults to 1.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        dict: Dictionary containing the perturbed PENDF data.
+
+    Raises:
+        None
+
+    """
+    data = {}
+    if 31 in smps:
+        data["pnu"] = smps[31].iterate_xs_samples()
+    if 33 in smps:
+        data["pxs"] = smps[33].iterate_xs_samples()
+    if processes == 1:
+        outs = {}
+        while True:
+            kws = {}
+
+            # -- Iterate perturbation data (xs, nubar)
+            for k, v in data.items():
+                item = next(v, False)
+                if not item:
+                    break
+                n, s = item
+                kws[k] = s
+            if not item:
+                break
+            kws.update(**kwargs)
+            print(n)
+            outs[n] = sandy.core.endf6.endf6_perturb_worker(pendf.data, pendf.data, n, **kws)
+
+    elif processes > 1:
+        pool = mp.Pool(processes=processes)
+        outs = {}
+
+        while True:
+            kws = {}
+            for k, v in data.items():
+                item = next(v, False)
+                if not item:
+                    break
+                n, s = item
+                kws[k] = s
+            if not item:
+                break
+            kws.update(**kwargs)
+            outs[n] = pool.apply_async(
+                sandy.core.endf6.endf6_perturb_worker,
+                (endf.data, pendf.data, n),
+                kws,
+                )
+
+        outs = {n: out.get() for n, out in outs.items()}
+        pool.close()
+        pool.join()
+
+    # if we keep ENDF6 and PENDF files in memory, convert them back into
+    # sandy Endf6 instances (must do it here because Endf6 object cannot be pickled)
+    if not kwargs.get("to_file", False) and not kwargs.get("to_ace", False):
+        outs = {k: {k1: sandy.Endf6(v1) for k1, v1 in v.items()} for k, v in outs.items()}
+    return outs
+
+def perturb_all_temps(endf, pendfs, smps, processes=1, **kwargs):
+    """
+    Apply perturbations to all temperatures in a PENDF file and reorganize the output.
+
+    Args:
+        endf (object): The ENDF data object.
+        pendfs (dict): Dictionary containing the PENDF data for each temperature section.
+        smps (dict): Dictionary of SMPs (Standardized Monte Carlo Parameters).
+        processes (int, optional): Number of processes to use for parallel execution. Defaults to 1.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        list: List of dictionaries, each containing the perturbed PENDF data for multiple temperatures.
+    """
+    all_perturbed_data = {}
+
+    for temp_id, pendf in pendfs.items():
+        print(f"Perturbing temperature {temp_id}")
+        all_perturbed_data[temp_id] = apply_pendf_pert(endf, pendf, smps, processes=processes, **kwargs)
+
+    # Reorganize the data into samples
+    perturbed_samples = []
+    sample_indices = set(k for d in all_perturbed_data.values() for k in d)
+
+    for idx in sample_indices:
+        sample = {temp_id: data[idx]["pendf"] for temp_id, data in all_perturbed_data.items() if idx in data}
+        perturbed_samples.append(sample)
+
+    return perturbed_samples
+
