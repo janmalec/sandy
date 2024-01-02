@@ -33,10 +33,21 @@ def split_pendf_by_temperature(text):
     last_index = 0
     last_mat_mf_mt = None
 
-    for line in text:
-        # Extract mat, mf, mt, and index values
-        mat, mf, mt, index = int(line[66:70].strip()), int(line[70:72].strip()), int(line[72:75].strip()), int(line[75:80].strip())
+    # If not split, split the text in lines
+    if isinstance(text, str):
+        text = text.split('\n')
 
+    for line in text:
+        # Skip empty lines
+        if line.strip() == '':
+            continue
+
+        # Extract mat, mf, mt, and index values
+        try:
+            mat, mf, mt, index = int(line[66:70].strip()), int(line[70:72].strip()), int(line[72:75].strip()), int(line[75:80].strip())
+        except ValueError:
+            print("Could not read index for:", line)
+            continue
         # Check for a change in (mat, mf, mt)
         if (mat, mf, mt) != last_mat_mf_mt and mf != 0 and mt != 0:
             current_temp_id = 1
