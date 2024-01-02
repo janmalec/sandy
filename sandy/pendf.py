@@ -18,25 +18,48 @@ __version__ = "0.1.0"
 
 pd.options.display.float_format = '{:.5e}'.format
 
-def split_pendf_by_temperature(text):
+def _split_pendf_format_1(lines):
     """
-    Splits a PENDF file into sections based on temperature.
+    Splits the given lines into sections based on a specific line pattern.
 
     Args:
-        text (str): The content of the PENDF file.
+        lines (list): The list of lines to be split.
 
     Returns:
-        dict: A dictionary where the keys are temperature section IDs and the values are the corresponding sections as strings.
+        dict: A dictionary where the keys are the section indexes (starting from 1) and the values are the corresponding sections.
     """
-    temperature_sections = {}
+    line_to_count = "                                                                     0 0  0    0"
+    indexes = [i for i, line in enumerate(lines) if line == line_to_count]
+    # each section ends at one of the indexes. Split by indexes
+    sections = []
+    for i, index in enumerate(indexes):
+        if i == 0:
+            sections.append(lines[:index])
+        else:
+            sections.append(lines[indexes[i-1]:index])
+    # add the last line from lines to all sections
+    for section in sections:
+        section.append(lines[indexes[-1]+1])
+        section.append('\n')
+    # Convert all sections back to text
+    sections = [''.join(section) for section in sections]
+    # convert to dict with indexes from 1
+    return {i+1: section for i, section in enumerate(sections)}
+
+def _split_pendf_format_2(lines):
+    """
+    Splits the given lines of a pendf file into temperature sections based on the (mat, mf, mt) values.
+
+    Args:
+        lines (list): The lines of the pendf file.
+
+    Returns:
+        dict: A dictionary containing temperature sections as values, where the keys are the temperature section IDs.
+    """
     current_temp_id = 1
     last_index = 0
     last_mat_mf_mt = None
-
-    # If not split, split the text in lines
-    if isinstance(text, str):
-        text = text.split('\n')
-
+    temperature_sections = dict()
     for line in text:
         # Skip empty lines
         if line.strip() == '':
@@ -75,6 +98,42 @@ def split_pendf_by_temperature(text):
         temperature_sections[temp_id] = ''.join(temperature_sections[temp_id])
 
     return temperature_sections
+
+
+def split_pendf_by_temperature(text):
+    """
+    Splits a PENDF file into sections based on temperature.
+
+    Args:
+        text (str): The content of the PENDF file.
+
+    Returns:
+        dict: A dictionary where the keys are temperature section IDs and the values are the corresponding sections as strings.
+    """
+
+
+    # If not split, split the text in lines
+    if isinstance(text, str):
+        text = text.split('\n')
+    
+    # Count the number of EOF lines to determine format
+    # Sometimes entire files is repeated, sometimes each section
+    eof_line  = "                                                                     0 0  0    0"
+    eof_lines = text.count(eof_line)
+
+    # if more than on EOF, the entire file is repeated
+    if eof_lines > 1:
+        print("Entire file is repeated.")
+        # Split by the first line
+        return _split_pendf_format_1(text)
+    # otherwise each section is repeated
+    elif eof_lines == 1:
+        print("Each section is repeated.")
+        # Split by temperature
+        return _split_pendf_format_2(text)
+    else:
+        print("No EOF lines found.")
+        return None
 
 def get_pendf_endf(text):
     """
