@@ -11,7 +11,11 @@ from os.path import join
 
 __author__ = "Jan Malec"
 __all__ = [
-        "Pendf",
+        "perturb_all_temps",
+        "split_pendf_by_temperature",
+        "get_pendf_endf",
+        "combine_pendf_sections",
+        "make_pendfs"
         ]
 
 __version__ = "0.1.0"
@@ -179,7 +183,6 @@ def combine_pendf_sections(temperature_sections):
 
     # Preprocess: Split each section into lines 
     preprocessed_sections = {temp_id: section.split('\n') for temp_id, section in temperature_sections.items()}
-    print(preprocessed_sections.keys())
 
     first_id = next(iter(preprocessed_sections))
     combined_lines = [preprocessed_sections[first_id][0]]
@@ -213,7 +216,6 @@ def combine_pendf_sections(temperature_sections):
                     zero_lines.append(line)
 
                 if not is_zero_line(line) and (mat, mf, mt) != current_mat_mf_mt:
-                    #print("end section", current_mat_mf_mt, temp_id, temp_id == max(preprocessed_sections.keys()))
                     break
                 line_counters[temp_id] = counter
 
@@ -297,7 +299,6 @@ def apply_pendf_pert(endf, pendf, smps, processes=1, **kwargs):
             if not item:
                 break
             kws.update(**kwargs)
-            print(n)
             outs[n] = sandy.core.endf6.endf6_perturb_worker(pendf.data, pendf.data, n, **kws)
 
     elif processes > 1:
@@ -348,7 +349,6 @@ def perturb_all_temps(endf, pendfs, smps, processes=1, **kwargs):
     all_perturbed_data = {}
 
     for temp_id, pendf in pendfs.items():
-        print(f"Perturbing temperature {temp_id}")
         all_perturbed_data[temp_id] = apply_pendf_pert(endf, pendf, smps, processes=processes, **kwargs)
 
     # Reorganize the data into samples
