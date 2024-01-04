@@ -6,6 +6,7 @@ from sandy.core.endf6 import _FormattedFile
 
 import logging
 import functools
+import multiprocessing as mp
 from tempfile import TemporaryDirectory
 from os.path import join
 
