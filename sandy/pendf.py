@@ -154,7 +154,7 @@ def get_pendf_endf(text):
     pendf_sections = {temp_id: sandy.Endf6.from_text(section) for temp_id, section in temperature_sections.items()}
     return pendf_sections
 
-def combine_pendf_sections(temperature_sections):
+def combine_pendf_sections(temperature_sections, method='entire_file'):
     """
     Combines multiple PENDF sections into a single section and writes it to an output file.
 
@@ -185,56 +185,83 @@ def combine_pendf_sections(temperature_sections):
     # Preprocess: Split each section into lines 
     preprocessed_sections = {temp_id: section.split('\n') for temp_id, section in temperature_sections.items()}
 
-    first_id = next(iter(preprocessed_sections))
-    combined_lines = [preprocessed_sections[first_id][0]]
-    current_mat_mf_mt = None
-    line_counters = {temp_id: 0 for temp_id in preprocessed_sections}
-    all_sections_processed = False
-    counter = 0
+    if method == 'sections':
+        first_id = next(iter(preprocessed_sections))
+        combined_lines = [preprocessed_sections[first_id][0]]
+        current_mat_mf_mt = None
+        line_counters = {temp_id: 0 for temp_id in preprocessed_sections}
+        all_sections_processed = False
+        counter = 0
 
-    while not all_sections_processed:
-        all_sections_processed = True
+        while not all_sections_processed:
+            all_sections_processed = True
 
-        for temp_id, section_lines in preprocessed_sections.items():
-            counter = line_counters[temp_id]
-            zero_lines = []
-            current_mat_mf_mt = None
-
-            while counter < len(section_lines):
-                line = section_lines[counter]
-                counter += 1
-
-                # skip on empty line
-                if line.strip() == '':
-                    continue
-
-                mat, mf, mt = extract_mat_mf_mt(line)
-
-                if current_mat_mf_mt is None and mf != 0 and mt != 0:
-                    current_mat_mf_mt = (mat, mf, mt)
-
-                if is_zero_line(line):
-                    zero_lines.append(line)
-
-                if not is_zero_line(line) and (mat, mf, mt) != current_mat_mf_mt:
-                    break
-                line_counters[temp_id] = counter
-
-                if not is_zero_line(line):
-                    combined_lines.append(line)
-
-                all_sections_processed = False
-            
-            # Append zero lines if this is the last section
-            if temp_id == max(preprocessed_sections.keys()):
-                combined_lines.extend(zero_lines)
+            for temp_id, section_lines in preprocessed_sections.items():
+                counter = line_counters[temp_id]
                 zero_lines = []
-
-            # Reset for the next section
-            if temp_id == max(preprocessed_sections.keys()):
                 current_mat_mf_mt = None
 
-    return '\n'.join(combined_lines) + '\n'
+                while counter < len(section_lines):
+                    line = section_lines[counter]
+                    counter += 1
+
+                    # skip on empty line
+                    if line.strip() == '':
+                        continue
+
+                    mat, mf, mt = extract_mat_mf_mt(line)
+
+                    if current_mat_mf_mt is None and mf != 0 and mt != 0:
+                        current_mat_mf_mt = (mat, mf, mt)
+
+                    if is_zero_line(line):
+                        zero_lines.append(line)
+
+                    if not is_zero_line(line) and (mat, mf, mt) != current_mat_mf_mt:
+                        break
+                    line_counters[temp_id] = counter
+
+                    if not is_zero_line(line):
+                        combined_lines.append(line)
+
+                    all_sections_processed = False
+                
+                # Append zero lines if this is the last section
+                if temp_id == max(preprocessed_sections.keys()):
+                    combined_lines.extend(zero_lines)
+                    zero_lines = []
+
+                # Reset for the next section
+                if temp_id == max(preprocessed_sections.keys()):
+                    current_mat_mf_mt = None
+
+        return '\n'.join(combined_lines) + '\n'
+    
+    elif method == 'entire_file':
+        combined_pendf = ""
+        section_keys = list(preprocessed_sections.keys())
+        for i, key in enumerate(section_keys):
+            lines = preprocessed_sections[key]
+
+            # Find the last non-empty line (excluding it for all sections)
+            last_line_index = -1
+            while not lines[last_line_index].strip() and last_line_index > -len(lines):
+                last_line_index -= 1
+
+            # Skip the first line for all but the first section
+            start_line_index = 1 if i > 0 else 0
+
+            # Append lines, ensuring each ends with a newline
+            for line in lines[start_line_index:last_line_index]:
+                combined_pendf += line.rstrip('\n') + '\n'
+
+        # Append the end of file line and an empty line for the last section
+        combined_pendf += "                                                                    -1 0  0    0\n\n"
+
+        return combined_pendf
+    
+    else:
+        raise ValueError(f"Invalid method: {method}")
 
 def make_pendfs(endf, **kwargs,):
     """
